@@ -1,0 +1,69 @@
+name: ci-cd.yml
+
+on:
+  push:
+    branches:
+      - main  # Change to your main branch name
+
+jobs:
+  build_and_test:
+    # test job configuration here...
+
+  deploy_to_lambda:
+    runs-on: ubuntu-latest
+    needs: build_and_test
+    if: ${{ success() }} # Only run if the previous job succeeded
+
+
+steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18.18.0'  
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Deploy to AWS Lambda
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          # Commands to package and deploy to Lambda using AWS CLI
+          
+        zip -r deployment-package.zip index.js package.json
+        aws lambda update-function-code --function-name YourFunctionName --zip-file fileb://deployment-package.zip
+
+      - name: Retrieve Secret from AWS Secrets Manager
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          aws secretsmanager get-secret-value --secret-id YourSecretName
+
+      - name: Run Dependency-Check for vulnerabilities
+        run: |
+          # Install OWASP Dependency-Check (example using npm)
+          npm install -g dependency-check
+
+          # Run Dependency-Check to scan for vulnerabilities
+          dependency-check --scan . --format HTML --out reports/
+
